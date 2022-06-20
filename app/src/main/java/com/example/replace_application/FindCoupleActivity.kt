@@ -9,6 +9,7 @@ import androidx.databinding.DataBindingUtil
 
 import com.example.replace_application.databinding.ActivityFindCoupleBinding
 import com.example.replace_application.utils.FBAuth
+import com.example.replace_application.utils.FBRef
 import com.google.android.gms.tasks.Task
 import com.google.firebase.dynamiclinks.DynamicLink
 import com.google.firebase.dynamiclinks.FirebaseDynamicLinks
@@ -27,10 +28,19 @@ class FindCoupleActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_find_couple)
 
-        binding.codeArea.text = FBAuth.getUid()
+        FBRef.myUserRef.child(FBAuth.getUid()).child("inviteCode").get().addOnSuccessListener {
+            binding.codeArea.text = it.value.toString()
+        }
 
         val code = binding.codeArea.text.toString()
         Log.d(TAG, code)
+
+        binding.after.setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java)
+            startActivity(intent)
+        }
+
+
 
         binding.shareCodeBtn.setOnClickListener {
             val link = "https://replace.page.link/join_couple?code=$code"
@@ -59,6 +69,11 @@ class FindCoupleActivity : AppCompatActivity() {
                             }
                         }
                     }
+        }
+
+        binding.enterCodeBtn.setOnClickListener {
+            val intent = Intent(this, TypeLinkActivity::class.java)
+            startActivity(intent)
         }
     }
 

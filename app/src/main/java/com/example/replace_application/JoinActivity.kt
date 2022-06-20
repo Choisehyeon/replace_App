@@ -59,10 +59,11 @@ class JoinActivity : AppCompatActivity() {
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
                     Log.d("JoinActivity", nickname.toString())
+                    val code = auth.currentUser!!.uid.substring(0,16)
+
                     FBRef.myUserRef
                         .child(auth.currentUser!!.uid)
-                        .push()
-                        .setValue(UserModel(nickname,false))
+                        .setValue(UserModel(nickname,false, code))
 
                     val intent = Intent(this, LoginActivity::class.java)
                     startActivity(intent)

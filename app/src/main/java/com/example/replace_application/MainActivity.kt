@@ -1,15 +1,19 @@
 package com.example.replace_application
 
+import android.content.Intent
 import android.location.Geocoder
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import androidx.core.view.GravityCompat
 import androidx.databinding.DataBindingUtil
 import com.example.replace_application.api.NaverApi
 import com.example.replace_application.resultmap.ResultMap
 import com.example.replace_application.databinding.ActivityMainBinding
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.*
 import com.naver.maps.map.overlay.Marker
@@ -44,9 +48,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
 
-        binding.menu.setOnClickListener {
 
-        }
+
 
         geocoder = Geocoder(this)
 
