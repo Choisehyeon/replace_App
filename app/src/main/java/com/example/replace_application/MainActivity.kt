@@ -1,17 +1,41 @@
 package com.example.replace_application
 
+import android.content.Context
 import android.content.Intent
 import android.location.Geocoder
+import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
+import android.view.MotionEvent
+import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
+import android.widget.Toast
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.GravityCompat
+import androidx.core.view.isVisible
 import androidx.databinding.DataBindingUtil
+import androidx.drawerlayout.widget.DrawerLayout
+import androidx.slidingpanelayout.widget.SlidingPaneLayout
+import com.example.replace_application.adapter.AddressLVAdapter
+import com.example.replace_application.adapter.KeywordLVAdapter
+import com.example.replace_application.api.KakaoApi
 import com.example.replace_application.api.NaverApi
-import com.example.replace_application.resultmap.ResultMap
+import com.example.replace_application.data.getadress.getAddress
+import com.example.replace_application.data.getfindaddress.Document
+import com.example.replace_application.data.getfindaddress.RoadAddress
+import com.example.replace_application.data.getfindaddress.getFindadress
 import com.example.replace_application.databinding.ActivityMainBinding
+import com.example.replace_application.resultmap.ResultMap
+import com.example.replace_application.model.AddressModel
+import com.example.replace_application.utils.FBAuth
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import com.naver.maps.geometry.LatLng
@@ -19,6 +43,8 @@ import com.naver.maps.map.*
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.widget.LocationButtonView
+import com.sothree.slidinguppanel.SlidingUpPanelLayout
+import kotlinx.coroutines.*
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -31,17 +57,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var naverMap: NaverMap
     var lat: Double = 0.0
     var lng: Double = 0.0
-    lateinit var geocoder : Geocoder
-    var mapAddress : String = ""
-    private lateinit var binding : ActivityMainBinding
+    lateinit var geocoder: Geocoder
+    val DocumentItems = mutableListOf<Document>()
+    val KeywordItems = mutableListOf<com.example.replace_application.data.getkeyword.Document>()
+    private lateinit var binding: ActivityMainBinding
+
 
     companion object {
 
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
-        val API_KEY_ID = "4mnlwhbnbf"
-        val API_KEY = "0s1NLYMxFqAkOROmp2PHNs3W9gxiAifoct6qaCpv"
-    }
 
+        /*val API_KEY_ID = "4mnlwhbnbf"
+         val API_KEY = "0s1NLYMxFqAkOROmp2PHNs3W9gxiAifoct6qaCpv"*/
+        const val BASE_URL = "https://dapi.kakao.com/"
+        const val API_KEY = "KakaoAK 640fb6c53b577568126ee0e851cecce0"
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,20 +79,74 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
 
 
-
+        findViewById<TextView>(R.id.logoutBtn).setOnClickListener {
+            Firebase.auth.signOut()
+            val intent = Intent(this, IntroActivity::class.java)
+            intent.flags =
+                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+        }
+        findViewById<Button>(R.id.connectCoupleBtn).setOnClickListener {
+            val intent = Intent(this, FindCoupleActivity::class.java)
+            startActivity(intent)
+        }
 
         geocoder = Geocoder(this)
+
 
         val fm = supportFragmentManager
         val mapFragment = fm.findFragmentById(R.id.mapView) as MapFragment?
             ?: MapFragment.newInstance().also {
                 fm.beginTransaction().add(R.id.mapView, it).commit()
             }
-
         mapFragment.getMapAsync(this)
 
         locationSource =
             FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE)
+
+        binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.HIDDEN
+        binding.addressListArea.visibility = View.INVISIBLE
+
+        binding.back.visibility = View.INVISIBLE
+
+
+
+
+
+        binding.findAddress.setOnTouchListener(object : View.OnTouchListener {
+            override fun onTouch(p0: View?, p1: MotionEvent?): Boolean {
+                if (p1?.action == MotionEvent.ACTION_DOWN) {
+                    binding.findAddress.isCursorVisible = true
+                    binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.HIDDEN
+                    binding.menu.visibility = View.INVISIBLE
+                    binding.back.visibility = View.VISIBLE
+
+                }
+
+                return false
+            }
+        })
+
+
+        binding.back.setOnClickListener {
+            binding.findAddress.setText(null)
+            binding.addressListArea.visibility = View.INVISIBLE
+            binding.menu.visibility = View.VISIBLE
+            binding.back.visibility = View.INVISIBLE
+            binding.findAddress.isCursorVisible = false
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(binding.findAddress.windowToken, 0)
+        }
+
+        binding.menu.setOnClickListener {
+            binding.drawerLayout.openDrawer(findViewById(R.id.main_drawer))
+        }
+
+        binding.addressRV.setOnItemClickListener { adapterView, view, position, id ->
+            val item = adapterView.getItemAtPosition(position) as Document
+            Toast.makeText(this, item.x, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, item.y, Toast.LENGTH_LONG).show()
+        }
 
     }
 
@@ -89,10 +173,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         naverMap.locationSource = locationSource
         val uiSettings = naverMap.uiSettings
         uiSettings.isZoomGesturesEnabled = true
-        uiSettings.isZoomControlEnabled = true
+        uiSettings.isZoomControlEnabled = false
         uiSettings.setLocationButtonEnabled(false)
         naverMap.setLocationTrackingMode(LocationTrackingMode.Follow)
         var currentButton = findViewById<LocationButtonView>(R.id.currentBtn)
+
 
         naverMap.addOnLocationChangeListener { location ->
             lat = location.latitude
@@ -110,17 +195,72 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
         val findAddress = findViewById<EditText>(R.id.findAddress)
+
+        findAddress.addTextChangedListener(object : TextWatcher {
+
+
+            override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
+                DocumentItems.clear()
+            }
+
+            override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
+
+
+                GlobalScope.launch(Dispatchers.IO) {
+                    getKeyword(binding.findAddress.text.toString(), lng.toString(), lat.toString())
+
+                    launch(Dispatchers.Main) {
+                        if(DocumentItems.size == 0 || DocumentItems.size == 1) {
+                            binding.addressListArea.visibility = View.INVISIBLE
+                        } else {
+                            binding.addressListArea.visibility = View.VISIBLE
+                        }
+                        val adapter = KeywordLVAdapter(KeywordItems)
+                        binding.addressRV.adapter = adapter
+                        adapter.notifyDataSetChanged()
+
+                    }
+                }
+            }
+
+            override fun afterTextChanged(p0: Editable?) {
+
+            }
+
+        })
+
+
+
+
         findAddress.setOnEditorActionListener { textView, action, event ->
+            DocumentItems.clear()
             var handled = false
             if (action == EditorInfo.IME_ACTION_DONE) {
-                val cor = geocoder.getFromLocationName(findAddress.text.toString(), 1)
+
+               /* GlobalScope.launch(Dispatchers.IO) {
+                    getFindAddress(findAddress.text.toString())
+
+                    launch(Dispatchers.Main) {
+                        binding.addressListArea.visibility = View.VISIBLE
+                        val adapter = AddressLVAdapter(DocumentItems)
+                        binding.addressRV.adapter = adapter
+                        adapter.notifyDataSetChanged()
+                        *//*binding.menu.visibility = View.VISIBLE
+                        binding.back.visibility = View.INVISIBLE*//*
+                        binding.findAddress.isCursorVisible = false
+                        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                        imm.hideSoftInputFromWindow(binding.findAddress.windowToken, 0)
+                    }
+                }*/
+
+               /* val cor = geocoder.getFromLocationName(findAddress.text.toString(), 1)
                 findMarker.position = LatLng(cor[0].latitude, cor[0].longitude)
                 findMarker.map = naverMap
                 cameraUpdate =
                     CameraUpdate.scrollAndZoomTo(LatLng(cor[0].latitude, cor[0].longitude), 15.0)
                         .animate(CameraAnimation.Fly, 3000)
                 naverMap.moveCamera(cameraUpdate)
-                findAddress.setText(null)
+                */
                 handled = true
             }
             handled
@@ -130,63 +270,122 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             val latitude = latLng.latitude
             val longitude = latLng.longitude
 
-            getLoadAddress("$longitude,$latitude")
-            Log.d("main","$longitude,$latitude")
 
-            findMarker.position = LatLng(latitude, longitude)
-            findMarker.map = naverMap
-            cameraUpdate = CameraUpdate.scrollTo(LatLng(latitude, longitude))
-            naverMap.moveCamera(cameraUpdate)
+            Log.d("main", "$longitude,$latitude")
 
+
+            //코루틴 사용
+            GlobalScope.launch(Dispatchers.IO) {
+                var (road, building) = getLoadAddress("$longitude", "$latitude")
+                Log.d("main", road)
+                Log.d("main", building)
+
+                if (building.equals("")) {
+                    launch(Dispatchers.Main) {
+                        findMarker.map = null
+                        binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.HIDDEN
+                    }
+                } else {
+                    launch(Dispatchers.Main) {
+                        findMarker.position = LatLng(latitude, longitude)
+                        findMarker.map = naverMap
+                        binding.placeName.text = building
+                        binding.roadAddress.text = road
+
+
+                        binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.COLLAPSED
+                        cameraUpdate = CameraUpdate.scrollTo(LatLng(latitude, longitude))
+                        naverMap.moveCamera(cameraUpdate)
+                    }
+                }
+
+            }
+
+        }
+
+        findMarker.setOnClickListener {
+
+            true
         }
     }
 
-    fun getLoadAddress(coord: String) {
-        Log.d("main", coord)
-        var check: Boolean = false
+    private suspend fun getLoadAddress(longitude: String, latitude: String): Pair<String, String> {
+        Log.d("MainActivity", longitude)
+        Log.d("MainActivity", latitude)
+        var roadAddress: String = ""
+        var buildingName: String = ""
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://naveropenapi.apigw.ntruss.com/map-reversegeocode/")
+            .baseUrl(BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
-        val api = retrofit.create(NaverApi::class.java)
+        val api = retrofit.create(KakaoApi::class.java)
 
-        val call = api.getAddress(API_KEY_ID, API_KEY,"coordsToaddr" ,coord, "epsg:4326", "addr,roadaddr", "json")
-        call.enqueue(object : Callback<ResultMap> {
-            override fun onResponse(call: Call<ResultMap>, response: Response<ResultMap>) {
-                if(response.code() == 200) {
-                    val mapResponse = response.body()
-                    Log.d("MainActivity", "result: " + mapResponse.toString())
-                    if(mapResponse!!.status.code == 0) {
-                        mapAddress = mapResponse.results[0].region.area1.name + " " + mapResponse.results[0].region.area2.name + " " + mapResponse.results[0].region.area3.name
+        val call = api.getLocation(API_KEY, longitude, latitude)
 
-                        if(mapResponse.results.size == 1) {
-                            mapAddress += " " + mapResponse.results[0].land.number1
-                            if(mapResponse.results[0].land.number2.length != 0) {
-                                mapAddress += "-" + mapResponse.results[0].land.number2
-                            }
-                        } else {
-                            mapAddress += " " + mapResponse.results[0].land.number1
-                            if(mapResponse.results[0].land.number2.length != 0) {
-                                mapAddress += "-" + mapResponse.results[0].land.number2
-                            }
-                            mapAddress += "\n" + mapResponse.results[1].land.addition0.value
-                            check = !mapResponse.results[1].land.addition0.value.equals("")
-                        }
+        val mapResponse = call.execute().body()
 
 
-                        Log.d("main", mapAddress)
-                        Log.d("main", check.toString())
-                    }
-                }
+        if (mapResponse!!.documents[0].road_address != null) {
+            roadAddress = mapResponse!!.documents[0].road_address.address_name
+            buildingName = mapResponse.documents[0].road_address.building_name
+        } else {
+            roadAddress = ""
+            buildingName = ""
+        }
+
+        return Pair(roadAddress, buildingName)
+    }
+
+    private suspend fun getFindAddress(text: String) {
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        val api = retrofit.create(KakaoApi::class.java)
+
+        val call = api.getAddress(API_KEY, text)
+
+        val mapResponse = call.execute().body()
+
+        val size = mapResponse!!.documents.size
+
+        if(size != 0) {
+            for(i in 0 until size) {
+                DocumentItems.add(mapResponse.documents[i])
             }
+        }
+    }
 
-            override fun onFailure(call: Call<ResultMap>, t: Throwable) {
-                Log.d("MainActivity", "result :" + t.message)
+    private suspend fun getKeyword(text: String, latitude: String, longitude: String) {
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        val api = retrofit.create(KakaoApi::class.java)
+
+        val call = api.getKeyword(API_KEY, text, longitude, latitude, 20000)
+
+        val mapResponse = call.execute().body()
+
+        Log.d("main", mapResponse.toString())
+        val size = mapResponse!!.documents.size
+
+        if(size != 0) {
+            for(i in 0 until size) {
+                KeywordItems.add(mapResponse.documents[i])
             }
+        }
 
-        })
+
 
     }
 
+
 }
+
+
+
+

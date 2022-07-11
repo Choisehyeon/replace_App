@@ -63,7 +63,7 @@ class JoinActivity : AppCompatActivity() {
 
                     FBRef.myUserRef
                         .child(auth.currentUser!!.uid)
-                        .setValue(UserModel(nickname,false, code))
+                        .setValue(UserModel(nickname,"", code))
 
                     val intent = Intent(this, LoginActivity::class.java)
                     startActivity(intent)

@@ -12,18 +12,26 @@
         <entry key="app/src/main/res/drawable/ic_launcher_background.xml" value="0.157" />
         <entry key="app/src/main/res/drawable/image_border_radius.xml" value="0.1595" />
         <entry key="app/src/main/res/drawable/typecode.xml" value="0.1595" />
-        <entry key="app/src/main/res/layout/activity_find_couple.xml" value="0.25" />
+        <entry key="app/src/main/res/layout/activity_find_address.xml" value="0.2953125" />
+        <entry key="app/src/main/res/layout/activity_find_couple.xml" value="0.125" />
         <entry key="app/src/main/res/layout/activity_intro.xml" value="0.1" />
         <entry key="app/src/main/res/layout/activity_invite_link.xml" value="0.165" />
         <entry key="app/src/main/res/layout/activity_join.xml" value="0.1" />
         <entry key="app/src/main/res/layout/activity_login.xml" value="0.1" />
         <entry key="app/src/main/res/layout/activity_main.xml" value="0.1" />
+        <entry key="app/src/main/res/layout/activity_main2.xml" value="0.1" />
         <entry key="app/src/main/res/layout/activity_splash.xml" value="0.1" />
         <entry key="app/src/main/res/layout/activity_type_link.xml" value="0.25" />
+        <entry key="app/src/main/res/layout/address_lv.xml" value="0.11673151750972763" />
+        <entry key="app/src/main/res/layout/board_rv.xml" value="0.25" />
+        <entry key="app/src/main/res/layout/bottom_sheet_behavior.xml" value="0.1" />
+        <entry key="app/src/main/res/layout/fragment_find.xml" value="0.104" />
         <entry key="app/src/main/res/layout/main_drawer_login.xml" value="0.24427083333333333" />
         <entry key="app/src/main/res/layout/main_drawer_login_couple.xml" value="0.24427083333333333" />
-        <entry key="app/src/main/res/layout/main_include_drawer.xml" value="0.335" />
+        <entry key="app/src/main/res/layout/main_drawer_login_solo.xml" value="0.11145833333333334" />
+        <entry key="app/src/main/res/layout/main_include_drawer.xml" value="0.165" />
         <entry key="app/src/main/res/layout/menu_item.xml" value="0.24427083333333333" />
+        <entry key="app/src/main/res/xml/network_security_config.xml" value="0.15070921985815602" />
       </map>
     </option>
   </component>

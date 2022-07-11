@@ -31,10 +31,10 @@
 
     <Button
         android:id="@+id/connectCoupleBtn"
-        android:layout_width="150sp"
+        android:layout_width="100sp"
         android:layout_height="30sp"
         android:layout_marginTop="50dp"
-        android:layout_marginRight="20dp"
+        android:layout_marginRight="50dp"
         android:background="@drawable/button_border_radius_main"
         android:text="커플 연결"
         app:layout_constraintBottom_toBottomOf="parent"
