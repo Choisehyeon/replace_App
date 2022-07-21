@@ -1,8 +1,11 @@
 package com.example.replace_application
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.location.Geocoder
+import android.location.Location
+import android.location.LocationManager
 import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -28,9 +31,9 @@ import com.example.replace_application.adapter.KeywordLVAdapter
 import com.example.replace_application.api.KakaoApi
 import com.example.replace_application.api.NaverApi
 import com.example.replace_application.data.getadress.getAddress
-import com.example.replace_application.data.getfindaddress.Document
 import com.example.replace_application.data.getfindaddress.RoadAddress
 import com.example.replace_application.data.getfindaddress.getFindadress
+import com.example.replace_application.data.getkeyword.Document
 import com.example.replace_application.databinding.ActivityMainBinding
 import com.example.replace_application.resultmap.ResultMap
 import com.example.replace_application.model.AddressModel
@@ -142,11 +145,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             binding.drawerLayout.openDrawer(findViewById(R.id.main_drawer))
         }
 
-        binding.addressRV.setOnItemClickListener { adapterView, view, position, id ->
-            val item = adapterView.getItemAtPosition(position) as Document
-            Toast.makeText(this, item.x, Toast.LENGTH_LONG).show()
-            Toast.makeText(this, item.y, Toast.LENGTH_LONG).show()
+        binding.writeBtn.setOnClickListener {
+            val intent = Intent(this, BoardWriteActivity::class.java)
+            intent.putExtra("place", binding.placeName.text.toString())
+            intent.putExtra("road", binding.roadAddress.text.toString())
+            startActivity(intent)
         }
+
 
     }
 
@@ -168,6 +173,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
+
+    @SuppressLint("MissingPermission")
     override fun onMapReady(naverMap: NaverMap) {
         this.naverMap = naverMap
         naverMap.locationSource = locationSource
@@ -177,6 +184,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         uiSettings.setLocationButtonEnabled(false)
         naverMap.setLocationTrackingMode(LocationTrackingMode.Follow)
         var currentButton = findViewById<LocationButtonView>(R.id.currentBtn)
+
+        val lm : LocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val current : Location?= lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
 
 
         naverMap.addOnLocationChangeListener { location ->
@@ -200,27 +210,31 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
             override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
-                DocumentItems.clear()
+                KeywordItems.clear()
             }
 
             override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
 
+                Log.d("mm", binding.findAddress.text.toString())
+                if(!binding.findAddress.text.toString().equals(""))
+                {
+                    GlobalScope.launch(Dispatchers.IO) {
 
-                GlobalScope.launch(Dispatchers.IO) {
-                    getKeyword(binding.findAddress.text.toString(), lng.toString(), lat.toString())
+                        getKeyword(binding.findAddress.text.toString(), current?.latitude.toString(), current?.longitude.toString())
 
-                    launch(Dispatchers.Main) {
-                        if(DocumentItems.size == 0 || DocumentItems.size == 1) {
-                            binding.addressListArea.visibility = View.INVISIBLE
-                        } else {
+                        launch(Dispatchers.Main) {
+
                             binding.addressListArea.visibility = View.VISIBLE
-                        }
-                        val adapter = KeywordLVAdapter(KeywordItems)
-                        binding.addressRV.adapter = adapter
-                        adapter.notifyDataSetChanged()
 
+                            val adapter = KeywordLVAdapter(KeywordItems, binding.findAddress.text.toString())
+                            binding.addressRV.adapter = adapter
+                            adapter.notifyDataSetChanged()
+
+                        }
                     }
                 }
+
+
             }
 
             override fun afterTextChanged(p0: Editable?) {
@@ -233,34 +247,39 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
         findAddress.setOnEditorActionListener { textView, action, event ->
-            DocumentItems.clear()
+            KeywordItems.clear()
             var handled = false
             if (action == EditorInfo.IME_ACTION_DONE) {
+                val cor = geocoder.getFromLocationName(findAddress.text.toString(), 1)
+                Log.d("mm", cor.toString())
 
-               /* GlobalScope.launch(Dispatchers.IO) {
-                    getFindAddress(findAddress.text.toString())
+                if(cor != null) {
+                    findMarker.position = LatLng(cor[0].latitude, cor[0].longitude)
+                    findMarker.map = naverMap
+                    cameraUpdate =
+                        CameraUpdate.scrollAndZoomTo(LatLng(cor[0].latitude, cor[0].longitude), 15.0)
+                            .animate(CameraAnimation.Fly, 3000)
+                    naverMap.moveCamera(cameraUpdate)
+                    binding.menu.visibility = View.VISIBLE
+                    binding.back.visibility = View.INVISIBLE
+                    binding.addressListArea.visibility = View.INVISIBLE
+                    binding.findAddress.isCursorVisible = false
+                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                    imm.hideSoftInputFromWindow(binding.findAddress.windowToken, 0)
+
+                }
+
+                GlobalScope.launch(Dispatchers.IO) {
+                    getKeyword(binding.findAddress.text.toString(), current?.latitude.toString(), current?.longitude.toString())
+
 
                     launch(Dispatchers.Main) {
-                        binding.addressListArea.visibility = View.VISIBLE
-                        val adapter = AddressLVAdapter(DocumentItems)
-                        binding.addressRV.adapter = adapter
-                        adapter.notifyDataSetChanged()
-                        *//*binding.menu.visibility = View.VISIBLE
-                        binding.back.visibility = View.INVISIBLE*//*
-                        binding.findAddress.isCursorVisible = false
-                        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                        imm.hideSoftInputFromWindow(binding.findAddress.windowToken, 0)
-                    }
-                }*/
+                        binding.placeName.text = KeywordItems[0].place_name
+                        binding.roadAddress.text = KeywordItems[0].road_address_name
 
-               /* val cor = geocoder.getFromLocationName(findAddress.text.toString(), 1)
-                findMarker.position = LatLng(cor[0].latitude, cor[0].longitude)
-                findMarker.map = naverMap
-                cameraUpdate =
-                    CameraUpdate.scrollAndZoomTo(LatLng(cor[0].latitude, cor[0].longitude), 15.0)
-                        .animate(CameraAnimation.Fly, 3000)
-                naverMap.moveCamera(cameraUpdate)
-                */
+                        binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.COLLAPSED
+                    }
+                }
                 handled = true
             }
             handled
@@ -277,10 +296,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             //코루틴 사용
             GlobalScope.launch(Dispatchers.IO) {
                 var (road, building) = getLoadAddress("$longitude", "$latitude")
-                Log.d("main", road)
-                Log.d("main", building)
+                getKeyword(road, "$longitude", "$latitude")
+                var place = ""
+                if(KeywordItems.size != 0)
+                {
+                    place = KeywordItems[0].place_name.toString()
+                }
 
-                if (building.equals("")) {
+                if (place.equals("")) {
                     launch(Dispatchers.Main) {
                         findMarker.map = null
                         binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.HIDDEN
@@ -289,7 +312,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     launch(Dispatchers.Main) {
                         findMarker.position = LatLng(latitude, longitude)
                         findMarker.map = naverMap
-                        binding.placeName.text = building
+                        binding.placeName.text = place
                         binding.roadAddress.text = road
 
 
@@ -300,6 +323,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
 
             }
+
+        }
+
+        binding.addressRV.setOnItemClickListener { adapterView, view, position, id ->
+            val item = adapterView.getItemAtPosition(position) as Document
+            findMarker.position = LatLng(item.y.toDouble(), item.x.toDouble())
+            findMarker.map = naverMap
+            cameraUpdate =
+                CameraUpdate.scrollAndZoomTo(LatLng(item.y.toDouble(), item.x.toDouble()), 15.0)
+                    .animate(CameraAnimation.Fly, 3000)
+            naverMap.moveCamera(cameraUpdate)
+            binding.addressListArea.visibility = View.INVISIBLE
+            binding.back.visibility = View.INVISIBLE
+            binding.menu.visibility = View.VISIBLE
+
+            binding.findAddress.setText(null)
+            binding.findAddress.isCursorVisible = false
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(binding.findAddress.windowToken, 0)
+
+
+            binding.placeName.text = item.place_name
+            binding.roadAddress.text = item.road_address_name
+            binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.COLLAPSED
 
         }
 
@@ -349,16 +396,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val mapResponse = call.execute().body()
 
-        val size = mapResponse!!.documents.size
+        if(mapResponse != null) {
+            val size = mapResponse!!.documents.size
 
-        if(size != 0) {
-            for(i in 0 until size) {
-                DocumentItems.add(mapResponse.documents[i])
+            if(size != 0) {
+                for(i in 0 until size) {
+                    // DocumentItems.add(mapResponse.documents[i])
+                }
             }
         }
     }
 
     private suspend fun getKeyword(text: String, latitude: String, longitude: String) {
+        KeywordItems.clear()
+
         val retrofit = Retrofit.Builder()
             .baseUrl(BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
@@ -366,20 +417,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val api = retrofit.create(KakaoApi::class.java)
 
-        val call = api.getKeyword(API_KEY, text, longitude, latitude, 20000)
+        val call = api.getKeyword(API_KEY, text, longitude, latitude, 20000, "distance")
 
         val mapResponse = call.execute().body()
 
         Log.d("main", mapResponse.toString())
-        val size = mapResponse!!.documents.size
 
-        if(size != 0) {
-            for(i in 0 until size) {
-                KeywordItems.add(mapResponse.documents[i])
+        if(mapResponse != null) {
+
+            val size = mapResponse!!.documents.size
+
+            if (size != 0) {
+                for (i in 0 until size) {
+                    KeywordItems.add(mapResponse.documents[i])
+                }
             }
         }
-
-
 
     }
 

@@ -28,6 +28,7 @@ interface KakaoApi {
         @Query("query") keyword : String,
         @Query("x") longitude : String,
         @Query("y") latitude : String,
-        @Query("radius") distance : Int
+        @Query("radius") distance : Int,
+        @Query("sort") sort : String
     ) : Call<getKeyword>
 }

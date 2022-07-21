@@ -8,7 +8,7 @@ import android.widget.TextView
 import com.example.replace_application.R
 import com.example.replace_application.data.getkeyword.Document
 
-class KeywordLVAdapter(val items : MutableList<Document>) : BaseAdapter() {
+class KeywordLVAdapter(val items : MutableList<Document>, val text: String) : BaseAdapter() {
 
     override fun getCount(): Int {
         return items.size
@@ -32,6 +32,8 @@ class KeywordLVAdapter(val items : MutableList<Document>) : BaseAdapter() {
         val item: Document = items[position]
 
         view!!.findViewById<TextView>(R.id.place_item).text = item.place_name
+
+
 
         return view!!
     }

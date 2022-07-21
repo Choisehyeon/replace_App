@@ -7,6 +7,7 @@ class FBRef {
         val database = Firebase.database
 
         val myUserRef = database.getReference("user_ref")
+        val boardRef = database.getReference("board_ref")
     }
 
 }
