@@ -11,11 +11,11 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.replace_application.BoardWriteActivity
 import com.example.replace_application.R
 
 class BoardImageRVAdapter(val context : Context, var image : MutableList<Uri>) :RecyclerView.Adapter<BoardImageRVAdapter.ViewHolder> () {
-
 
     private var listener : OnSendStateInterface? = null
 
@@ -49,7 +49,10 @@ class BoardImageRVAdapter(val context : Context, var image : MutableList<Uri>) :
             }
 
             val imageArea = itemView.findViewById<ImageView>(R.id.board_image)
-            imageArea.setImageURI(item)
+            Glide.with(context)
+                .load(item)
+                .into(imageArea)
+
         }
     }
 

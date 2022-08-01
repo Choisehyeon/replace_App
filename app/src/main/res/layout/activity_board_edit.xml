@@ -15,13 +15,12 @@
             android:layout_marginTop="30dp">
 
             <EditText
-                android:id="@+id/titleArea"
+                android:id="@+id/editTitle"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_marginLeft="10dp"
                 android:layout_marginRight="10dp"
                 android:background="@drawable/board_border_radius"
-                android:hint="제목"
                 android:paddingLeft="15dp" />
         </LinearLayout>
 
@@ -31,14 +30,13 @@
             android:layout_marginTop="20dp">
 
             <EditText
-                android:id="@+id/contentArea"
+                android:id="@+id/editContent"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_marginLeft="10dp"
                 android:layout_marginRight="10dp"
                 android:background="@drawable/board_border_radius"
                 android:gravity="start"
-                android:hint="내용을 입력하세요"
                 android:padding="15dp"
                 android:scrollbars="vertical" />
 
@@ -49,7 +47,7 @@
             android:layout_width="match_parent"
             android:layout_height="30dp"
             android:orientation="horizontal">
-            
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="0dp"
@@ -103,12 +101,12 @@
 
 
         <Button
-            android:id="@+id/writeEnterBtn"
+            android:id="@+id/writeEditBtn"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_margin="20dp"
             android:background="@drawable/button_border_radius_main"
-            android:text="글쓰기 완료"
+            android:text="수정 완료"
             android:textSize="15sp" />
 
 

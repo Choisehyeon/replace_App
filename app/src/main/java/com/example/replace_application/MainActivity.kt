@@ -1,12 +1,13 @@
 package com.example.replace_application
 
 import android.annotation.SuppressLint
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-import android.os.AsyncTask
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.Editable
@@ -19,28 +20,26 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
-import android.widget.Toast
-import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.view.GravityCompat
-import androidx.core.view.isVisible
 import androidx.databinding.DataBindingUtil
-import androidx.drawerlayout.widget.DrawerLayout
-import androidx.slidingpanelayout.widget.SlidingPaneLayout
-import com.example.replace_application.adapter.AddressLVAdapter
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.bumptech.glide.Glide
+import com.example.replace_application.adapter.BoardRVAdapter
 import com.example.replace_application.adapter.KeywordLVAdapter
 import com.example.replace_application.api.KakaoApi
-import com.example.replace_application.api.NaverApi
-import com.example.replace_application.data.getadress.getAddress
-import com.example.replace_application.data.getfindaddress.RoadAddress
-import com.example.replace_application.data.getfindaddress.getFindadress
 import com.example.replace_application.data.getkeyword.Document
 import com.example.replace_application.databinding.ActivityMainBinding
-import com.example.replace_application.resultmap.ResultMap
-import com.example.replace_application.model.AddressModel
-import com.example.replace_application.utils.FBAuth
-import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.example.replace_application.model.BoardModel
+import com.example.replace_application.utils.FBRef
+import com.example.replace_application.utils.FBRef.Companion.database
+import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
+import com.kakao.sdk.auth.Constants.CODE
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.*
 import com.naver.maps.map.overlay.Marker
@@ -48,9 +47,6 @@ import com.naver.maps.map.util.FusedLocationSource
 import com.naver.maps.map.widget.LocationButtonView
 import com.sothree.slidinguppanel.SlidingUpPanelLayout
 import kotlinx.coroutines.*
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -63,12 +59,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     lateinit var geocoder: Geocoder
     val DocumentItems = mutableListOf<Document>()
     val KeywordItems = mutableListOf<com.example.replace_application.data.getkeyword.Document>()
+    lateinit var rvAdapter: BoardRVAdapter
     private lateinit var binding: ActivityMainBinding
+    private lateinit var key : String
+    var placeId = ""
+    val myRef = database.getReference("board_ref")
+    val items = ArrayList<BoardModel>()
+    val itemkeyList = ArrayList<String>()
 
 
     companion object {
 
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
+        private const val CODE = 200
 
         /*val API_KEY_ID = "4mnlwhbnbf"
          val API_KEY = "0s1NLYMxFqAkOROmp2PHNs3W9gxiAifoct6qaCpv"*/
@@ -80,6 +83,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
+        intent.getBooleanExtra("write", false)
+
+        rvAdapter = BoardRVAdapter(baseContext, items, itemkeyList)
 
 
         findViewById<TextView>(R.id.logoutBtn).setOnClickListener {
@@ -114,8 +120,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
 
-
-
         binding.findAddress.setOnTouchListener(object : View.OnTouchListener {
             override fun onTouch(p0: View?, p1: MotionEvent?): Boolean {
                 if (p1?.action == MotionEvent.ACTION_DOWN) {
@@ -145,14 +149,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             binding.drawerLayout.openDrawer(findViewById(R.id.main_drawer))
         }
 
+
+
         binding.writeBtn.setOnClickListener {
             val intent = Intent(this, BoardWriteActivity::class.java)
-            intent.putExtra("place", binding.placeName.text.toString())
-            intent.putExtra("road", binding.roadAddress.text.toString())
-            startActivity(intent)
+            //intent.putExtra("place", binding.placeName.text.toString())
+            //intent.putExtra("road", binding.roadAddress.text.toString())
+            intent.putExtra("placeId", placeId.toString())
+            startActivityForResult(intent, CODE)
         }
 
 
+
+        binding.rv.adapter = rvAdapter
+        binding.rv.layoutManager = LinearLayoutManager(this)
+
+
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (resultCode == RESULT_OK) {
+            key = data?.getStringExtra("key")!!
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -301,6 +321,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 if(KeywordItems.size != 0)
                 {
                     place = KeywordItems[0].place_name.toString()
+                    placeId = KeywordItems[0].id
+                    binding.placeId.text = placeId
+                    getContentData(KeywordItems[0].id)
                 }
 
                 if (place.equals("")) {
@@ -347,6 +370,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             binding.placeName.text = item.place_name
             binding.roadAddress.text = item.road_address_name
             binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.COLLAPSED
+            placeId = item.id
+            binding.placeId.text = placeId
+            getContentData(item.id)
 
         }
 
@@ -433,10 +459,34 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
             }
         }
-
     }
 
+    private fun getContentData(placeId : String) {
 
+        val postListener = object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+
+                items.clear()
+
+                for(dataModel in dataSnapshot.children) {
+                    Log.d("main", dataModel.toString())
+                    val item = dataModel.getValue(BoardModel::class.java)
+                    items.add(item!!)
+                    Log.d("main_key", dataModel.key.toString())
+                    itemkeyList.add(dataModel.key.toString())
+                }
+                items.reverse()
+                itemkeyList.reverse()
+                rvAdapter.notifyDataSetChanged()
+            }
+            override fun onCancelled(databaseError: DatabaseError) {
+                Log.w("ContentListActivity", "loadPost: ", databaseError.toException())
+            }
+        }
+        myRef.child(placeId).addValueEventListener(postListener)
+
+
+    }
 }
 
 

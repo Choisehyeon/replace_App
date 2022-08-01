@@ -143,7 +143,9 @@
 
                         </LinearLayout>
 
-                        <View
+                        <TextView
+                            android:id="@+id/placeId"
+                            android:visibility="invisible"
                             android:layout_width="0dp"
                             android:layout_height="0dp"
                             android:layout_weight="1" />

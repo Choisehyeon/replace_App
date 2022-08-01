@@ -2,11 +2,9 @@ package com.example.replace_application.model
 
 data class BoardModel(
 
-    val title : String,
-    val context : String,
-    val time : String,
-    val uid : String,
-    val roadAddress : String,
-    val placeName : String
-
+    val title : String = "",
+    val content : String = "",
+    val time : String = "",
+    val uid : String = "",
+    val placeId : String = ""
 )
