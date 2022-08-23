@@ -157,7 +157,7 @@
                             android:layout_height="60dp"
                             android:layout_gravity="end"
                             android:padding="10dp"
-                            android:src="@drawable/love_logo" />
+                            android:src="@drawable/bookmark_no" />
                     </LinearLayout>
                 </LinearLayout>
 

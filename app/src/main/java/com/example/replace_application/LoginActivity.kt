@@ -7,6 +7,8 @@ import android.util.Log
 import android.view.View
 import androidx.databinding.DataBindingUtil
 import com.example.replace_application.databinding.ActivityLoginBinding
+import com.example.replace_application.utils.FBAuth
+import com.example.replace_application.utils.FBRef
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
@@ -27,6 +29,7 @@ class LoginActivity : AppCompatActivity() {
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
                     // Sign in success, update UI with the signed-in user's information
+                    //Log.d("Login", FBRef.myUserRef.child(FBAuth.getUid()).child("inviteCode"))
                     val intent = Intent(this, FindCoupleActivity::class.java)
                     startActivity(intent)
                 } else {

@@ -22,7 +22,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Replace_Application"
         android:usesCleartextTraffic="true"
-        tools:targetApi="m">
+        tools:targetApi="n">
+        <activity
+            android:name=".BookMarkActivity"
+            android:exported="false" />
         <activity
             android:name=".BoardEditActivity"
             android:exported="false" />

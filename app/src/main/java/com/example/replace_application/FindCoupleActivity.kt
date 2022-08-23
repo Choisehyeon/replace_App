@@ -7,38 +7,48 @@ import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
+import com.example.replace_application.database.UserDatabase
 
 import com.example.replace_application.databinding.ActivityFindCoupleBinding
 import com.example.replace_application.model.UserModel
 import com.example.replace_application.utils.FBAuth
 import com.example.replace_application.utils.FBRef
-import com.google.android.gms.tasks.Task
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.dynamiclinks.DynamicLink
 import com.google.firebase.dynamiclinks.FirebaseDynamicLinks
-import com.google.firebase.dynamiclinks.ShortDynamicLink
 import com.google.firebase.dynamiclinks.ktx.*
 import com.google.firebase.ktx.Firebase
 import com.kakao.sdk.link.LinkClient
 import com.kakao.sdk.template.model.*
-import java.lang.Exception
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.launch
 
 class FindCoupleActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityFindCoupleBinding
     private val TAG = FindCoupleActivity::class.java.simpleName
-    var code: String = ""
+    var code: String? = ""
+    private lateinit var db : UserDatabase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_find_couple)
 
-        FBRef.myUserRef.child(FBAuth.getUid()).child("inviteCode").get().addOnSuccessListener {
+        db = UserDatabase.getDatabase(this)
+
+        /*FBRef.myUserRef.child(FBAuth.getUid()).child("inviteCode").get().addOnSuccessListener {
+            Log.d("Code", it.value.toString())
             binding.codeArea.text = it.value.toString()
             code = it.value.toString()
             Log.d(TAG, it.value.toString())
+        }*/
+
+        CoroutineScope(IO).launch {
+            code = db.userDao().getInviteCode(FBAuth.getUid())
+            binding.codeArea.text = code
         }
 
 
@@ -61,7 +71,7 @@ class FindCoupleActivity : AppCompatActivity() {
                     ).buildShortDynamicLink()
                     .addOnSuccessListener { (shortLink, flowChartLink) ->
                         Log.d(TAG, shortLink.toString())
-                        template = getTemplate(code, shortLink!!)
+                        template = getTemplate(code!!, shortLink!!)
 
                         LinkClient.instance.defaultTemplate(this, template!!) { linkResult, error ->
                             if (error != null) {

@@ -16,6 +16,7 @@ import com.bumptech.glide.Glide
 import com.example.replace_application.BoardInsideActivity
 import com.example.replace_application.MainActivity
 import com.example.replace_application.R
+import com.example.replace_application.entity.Board
 import com.example.replace_application.model.BoardModel
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.android.gms.tasks.OnSuccessListener
@@ -28,13 +29,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class BoardRVAdapter(
-    val context: Context, val dataList: List<BoardModel>,
-    val keyList: List<String>
+    val context: Context, val dataList: List<Board>,
 ) : RecyclerView.Adapter<BoardRVAdapter.ViewHolder>() {
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
-        fun bindItems(item: BoardModel, key: String, context: Context) {
+        fun bindItems(item: Board,  context: Context) {
 
             val title = itemView.findViewById<TextView>(R.id.contentTitle)
             title.text = item.title
@@ -53,49 +53,17 @@ class BoardRVAdapter(
             }
 
             val contentImg = itemView.findViewById<ImageView>(R.id.contentImg)
-            val imgNum = itemView.findViewById<TextView>(R.id.boardImgNum)
+            contentImg.setImageBitmap(item.image)
 
-            getImageData(key, contentImg, context, imgNum)
+            //getImageData(key, contentImg, context, imgNum)
 
 
             itemView.setOnClickListener {
                 val intent = Intent(context, BoardInsideActivity::class.java)
-                intent.putExtra("key", key)
-                intent.putExtra("img_size", imgNum.text)
-                intent.putExtra("placeId", item.placeId)
+                intent.putExtra("boardId", item.id)
                 context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
 
-        }
-
-        private fun getImageData(key: String, imageView: ImageView, context: Context, textView: TextView) {
-            val list = Firebase.storage.reference.child(key + "/")
-            Log.d("hello", list.toString())
-
-            var imgCount = 0
-
-            list.listAll()
-                .addOnSuccessListener { listResult ->
-                    for (item in listResult!!.items) {
-                        imgCount++
-                    }
-                    textView.text = "+" + (imgCount-1).toString()
-                }
-
-            val storageReference = Firebase.storage.reference.child(key + "/0.png")
-
-            storageReference.downloadUrl.addOnCompleteListener(OnCompleteListener { task ->
-                if (task.isSuccessful) {
-
-                    Glide.with(context)
-                        .load(task.result)
-                        .centerCrop()
-                        .into(imageView)
-
-                } else {
-                    imageView.isVisible = false
-                }
-            })
         }
     }
 
@@ -108,7 +76,7 @@ class BoardRVAdapter(
     }
 
     override fun onBindViewHolder(holder: BoardRVAdapter.ViewHolder, position: Int) {
-        holder.bindItems(dataList[position], keyList[position], context)
+        holder.bindItems(dataList[position], context)
     }
 
     override fun getItemCount(): Int {

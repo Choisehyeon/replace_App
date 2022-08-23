@@ -9,25 +9,29 @@ import android.util.Log
 import android.view.View
 import android.widget.EditText
 import androidx.databinding.DataBindingUtil
+import com.example.replace_application.database.UserDatabase
 
 import com.example.replace_application.databinding.ActivityJoinBinding
-import com.example.replace_application.model.UserModel
-import com.example.replace_application.utils.FBRef
+import com.example.replace_application.entity.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import java.lang.StringBuilder
-import kotlin.random.Random
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 class JoinActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
     private lateinit var binding: ActivityJoinBinding
+    private lateinit var db : UserDatabase
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_join)
+
+        db = UserDatabase.getDatabase(this)
 
         val textWatcher = object : TextWatcher {
             override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
@@ -60,10 +64,16 @@ class JoinActivity : AppCompatActivity() {
                 if (task.isSuccessful) {
                     Log.d("JoinActivity", nickname.toString())
                     val code = auth.currentUser!!.uid.substring(0,16)
+                    Log.d("JoinActivity", code.toString())
 
-                    FBRef.myUserRef
+                    /*FBRef.myUserRef
                         .child(auth.currentUser!!.uid)
-                        .setValue(UserModel(nickname,"", code))
+                        .setValue(UserModel(nickname,"", code))*/
+
+                    GlobalScope.launch(Dispatchers.IO) {
+                        db.userDao().insertUser(User(auth.currentUser!!.uid, nickname, "", code))
+                    }
+
 
                     val intent = Intent(this, LoginActivity::class.java)
                     startActivity(intent)

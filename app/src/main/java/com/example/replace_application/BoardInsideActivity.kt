@@ -1,119 +1,104 @@
 package com.example.replace_application
 
 import android.content.Intent
-import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Handler
 import android.util.Log
-import android.view.View
 import androidx.core.view.isVisible
 import androidx.databinding.DataBindingUtil
-import androidx.viewpager.widget.ViewPager
-import com.example.replace_application.adapter.ViewPagerAdapter
+import com.example.replace_application.database.BoardDatabase
 import com.example.replace_application.databinding.ActivityBoardInsideBinding
+import com.example.replace_application.entity.Board
 import com.example.replace_application.model.BoardModel
 import com.example.replace_application.utils.FBAuth
 import com.example.replace_application.utils.FBRef
-import com.google.android.gms.tasks.OnCompleteListener
-import com.google.android.gms.tasks.OnSuccessListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
-import me.relex.circleindicator.CircleIndicator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import java.lang.Exception
 
 class BoardInsideActivity : AppCompatActivity() {
 
-    private lateinit var binding : ActivityBoardInsideBinding
-    internal lateinit var viewPager: ViewPager
-    private val image = ArrayList<Uri>()
+    private lateinit var binding: ActivityBoardInsideBinding
+    private lateinit var db: BoardDatabase
+    var boardId: Long = 0
+    lateinit var deleteBoard: Board
+    lateinit var placeId : String
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_board_inside)
 
-        viewPager = binding.viewPager as ViewPager
-        val key = intent.getStringExtra("key")
-        val image_num = intent.getStringExtra("img_size")
-        val placeId = intent.getStringExtra("placeId")
-        val img_size = image_num!!.toInt() + 1
-        Log.d("Board", img_size.toString())
+        db = BoardDatabase.getDatabase(this)
 
-        getBoardData(key!!, placeId!!)
-        getImageUri(key!!)
+        boardId = intent.getLongExtra("boardId", 0)
+        Log.d("BoardInside", boardId.toString())
 
-
-        val adapter = ViewPagerAdapter(this, key!!, img_size)
-        viewPager.adapter = adapter
-        binding.indicator.setViewPager(viewPager)
+        getBoardData(boardId)
 
 
         binding.updateBtn.setOnClickListener {
             val intent = Intent(this, BoardEditActivity::class.java)
-            intent.putExtra("key", key)
-            intent.putExtra("placeId", placeId)
-            intent.putExtra("image_list", image)
+            intent.putExtra("boardId", boardId)
             startActivity(intent)
         }
 
         binding.deleteBtn.setOnClickListener {
-            FBRef.boardRef.child(placeId).child(key).removeValue()
-            finish()
+            CoroutineScope(Dispatchers.Main).launch {
+                CoroutineScope(Dispatchers.Default).async {
+                    db.boardDao().deleteBoard(deleteBoard)
+                    intent.putExtra("placeId", placeId)
+                }.await()
+                setResult(RESULT_OK, intent)
+                finish()
+            }
         }
-
-
 
     }
 
-    private fun getBoardData(key : String, placeId : String) {
-        val postListener = object : ValueEventListener {
-            override fun onDataChange(dataSnapshot: DataSnapshot) {
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
 
-                try {
-                    Log.d("boardInside", dataSnapshot.toString())
-
-
-                    val dataModel = dataSnapshot.getValue(BoardModel::class.java)
-
-                    binding.boardTitle.text = dataModel!!.title
-                    binding.boardDate.text = dataModel.time
-                    binding.boardContent.text = dataModel.content
-
-                    val myUid = FBAuth.getUid()
-                    val writerUid = dataModel.uid
-
-                    if (myUid.equals(writerUid)) {
-                        binding.updateBtn.isVisible = true
-                        binding.deleteBtn.isVisible = true
-                    } else {
-                    }
-                } catch (e : Exception) {
-                    Log.d("boardInside", "삭제완료")
-                }
-
-            }
-            override fun onCancelled(databaseError: DatabaseError) {
-                Log.w("ContentListActivity", "loadPost: ", databaseError.toException())
-            }
+        if (resultCode == RESULT_OK) {
+            boardId = data?.getLongExtra("boardId", 0)!!
+            Log.d("BoardInsideFin", boardId.toString())
+            getBoardData(boardId)
         }
-        FBRef.boardRef.child(placeId).child(key).addValueEventListener(postListener)
     }
 
-    private fun getImageUri(key : String) {
-        val list = Firebase.storage.reference.child(key + "/")
+    private fun getBoardData(boardId: Long) {
 
-// Download directly from StorageReference using Glide
-// (See MyAppGlideModule for Loader registration)
-        list.listAll()
-            .addOnSuccessListener { listResult ->
-                for (item in listResult!!.items) {
+        CoroutineScope(Dispatchers.Main).launch {
+            val board = CoroutineScope(Dispatchers.Default).async {
+                db.boardDao().findById(boardId)
 
-                    item.downloadUrl.addOnSuccessListener { uri -> image.add(uri!!) }
+            }.await()
 
-                }
+            deleteBoard = board
+            placeId = board.placeId
+            binding.boardTitle.text = board!!.title
+            binding.boardContent.text = board!!.content
+            binding.boardDate.text = board!!.time
+            binding.boardImage.setImageBitmap(board.image)
+
+            if (FBAuth.getUid().equals(board.uid)) {
+                binding.updateBtn.isVisible = true
+                binding.deleteBtn.isVisible = true
             }
+        }
+    }
+
+    override fun onBackPressed() {
+        super.onBackPressed()
+
+        intent.putExtra("placeId", placeId)
+        setResult(RESULT_OK, intent)
     }
 }

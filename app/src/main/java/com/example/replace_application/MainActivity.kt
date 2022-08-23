@@ -1,13 +1,11 @@
 package com.example.replace_application
 
 import android.annotation.SuppressLint
-import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.Editable
@@ -22,24 +20,21 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.databinding.DataBindingUtil
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.bumptech.glide.Glide
 import com.example.replace_application.adapter.BoardRVAdapter
+import com.example.replace_application.adapter.BookmarkRVAdapter
 import com.example.replace_application.adapter.KeywordLVAdapter
 import com.example.replace_application.api.KakaoApi
 import com.example.replace_application.data.getkeyword.Document
+import com.example.replace_application.database.BoardDatabase
+import com.example.replace_application.database.BookmarkDatabase
+import com.example.replace_application.database.UserDatabase
 import com.example.replace_application.databinding.ActivityMainBinding
-import com.example.replace_application.model.BoardModel
-import com.example.replace_application.utils.FBRef
+import com.example.replace_application.entity.Board
+import com.example.replace_application.entity.Bookmark
+import com.example.replace_application.utils.FBAuth
 import com.example.replace_application.utils.FBRef.Companion.database
-import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ValueEventListener
-import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
-import com.google.firebase.storage.ktx.storage
-import com.kakao.sdk.auth.Constants.CODE
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.*
 import com.naver.maps.map.overlay.Marker
@@ -60,13 +55,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     val DocumentItems = mutableListOf<Document>()
     val KeywordItems = mutableListOf<com.example.replace_application.data.getkeyword.Document>()
     lateinit var rvAdapter: BoardRVAdapter
+    lateinit var bookmarkRvAdapter : BookmarkRVAdapter
     private lateinit var binding: ActivityMainBinding
-    private lateinit var key : String
+    private lateinit var key: String
     var placeId = ""
-    val myRef = database.getReference("board_ref")
-    val items = ArrayList<BoardModel>()
-    val itemkeyList = ArrayList<String>()
+    var items = ArrayList<Board>()
+    var bookmarkList = ArrayList<String>()
 
+    private lateinit var db: BoardDatabase
+    private lateinit var bookmarkdb : BookmarkDatabase
 
     companion object {
 
@@ -85,9 +82,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         intent.getBooleanExtra("write", false)
 
-        rvAdapter = BoardRVAdapter(baseContext, items, itemkeyList)
+        db = BoardDatabase.getDatabase(this)
+        bookmarkdb = BookmarkDatabase.getDatabase(this)
+
+        getBookmarkData(FBAuth.getUid())
 
 
+        //로그아웃 버튼 클릭시 메인페이지로 이동
         findViewById<TextView>(R.id.logoutBtn).setOnClickListener {
             Firebase.auth.signOut()
             val intent = Intent(this, IntroActivity::class.java)
@@ -95,14 +96,28 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
         }
+
+        //커플 연결 버튼 클릭시 커플 연결페이지로 이동
         findViewById<Button>(R.id.connectCoupleBtn).setOnClickListener {
             val intent = Intent(this, FindCoupleActivity::class.java)
             startActivity(intent)
         }
 
+        //북마크 클릭시 북마크 페이지로 이동
+        findViewById<TextView>(R.id.inBookmark).setOnClickListener {
+            val intent = Intent(this, BookMarkActivity::class.java)
+            startActivity(intent)
+        }
+
+        //내가 작성한 글 클릭시 내가 작성한 글 목록 페이지로 이동
+        findViewById<TextView>(R.id.inMyBoard).setOnClickListener {
+
+        }
+
         geocoder = Geocoder(this)
 
 
+        //네이버맵 동적으로 불러오기
         val fm = supportFragmentManager
         val mapFragment = fm.findFragmentById(R.id.mapView) as MapFragment?
             ?: MapFragment.newInstance().also {
@@ -110,6 +125,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         mapFragment.getMapAsync(this)
 
+        //내장 위치 추적 기능 사용
         locationSource =
             FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE)
 
@@ -151,6 +167,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
 
+
         binding.writeBtn.setOnClickListener {
             val intent = Intent(this, BoardWriteActivity::class.java)
             //intent.putExtra("place", binding.placeName.text.toString())
@@ -160,6 +177,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
 
+        getContentData(placeId)
+
+
+        rvAdapter = BoardRVAdapter(baseContext, items)
 
         binding.rv.adapter = rvAdapter
         binding.rv.layoutManager = LinearLayoutManager(this)
@@ -171,7 +192,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (resultCode == RESULT_OK) {
-            key = data?.getStringExtra("key")!!
+            placeId = data?.getStringExtra("placeId").toString()
+            Log.d("board", placeId)
+            getContentData(placeId)
         }
     }
 
@@ -205,8 +228,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         naverMap.setLocationTrackingMode(LocationTrackingMode.Follow)
         var currentButton = findViewById<LocationButtonView>(R.id.currentBtn)
 
-        val lm : LocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val current : Location?= lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        val lm: LocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val current: Location? = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
 
 
         naverMap.addOnLocationChangeListener { location ->
@@ -236,17 +259,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
 
                 Log.d("mm", binding.findAddress.text.toString())
-                if(!binding.findAddress.text.toString().equals(""))
-                {
+                if (!binding.findAddress.text.toString().equals("")) {
                     GlobalScope.launch(Dispatchers.IO) {
 
-                        getKeyword(binding.findAddress.text.toString(), current?.latitude.toString(), current?.longitude.toString())
+                        getKeyword(
+                            binding.findAddress.text.toString(),
+                            current?.latitude.toString(),
+                            current?.longitude.toString()
+                        )
 
                         launch(Dispatchers.Main) {
 
                             binding.addressListArea.visibility = View.VISIBLE
 
-                            val adapter = KeywordLVAdapter(KeywordItems, binding.findAddress.text.toString())
+                            val adapter =
+                                KeywordLVAdapter(KeywordItems, binding.findAddress.text.toString())
                             binding.addressRV.adapter = adapter
                             adapter.notifyDataSetChanged()
 
@@ -273,11 +300,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 val cor = geocoder.getFromLocationName(findAddress.text.toString(), 1)
                 Log.d("mm", cor.toString())
 
-                if(cor != null) {
+                if (cor != null) {
                     findMarker.position = LatLng(cor[0].latitude, cor[0].longitude)
                     findMarker.map = naverMap
                     cameraUpdate =
-                        CameraUpdate.scrollAndZoomTo(LatLng(cor[0].latitude, cor[0].longitude), 15.0)
+                        CameraUpdate.scrollAndZoomTo(
+                            LatLng(cor[0].latitude, cor[0].longitude),
+                            15.0
+                        )
                             .animate(CameraAnimation.Fly, 3000)
                     naverMap.moveCamera(cameraUpdate)
                     binding.menu.visibility = View.VISIBLE
@@ -290,7 +320,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
 
                 GlobalScope.launch(Dispatchers.IO) {
-                    getKeyword(binding.findAddress.text.toString(), current?.latitude.toString(), current?.longitude.toString())
+                    getKeyword(
+                        binding.findAddress.text.toString(),
+                        current?.latitude.toString(),
+                        current?.longitude.toString()
+                    )
 
 
                     launch(Dispatchers.Main) {
@@ -311,6 +345,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
             Log.d("main", "$longitude,$latitude")
+            getBookmarkData(FBAuth.getUid())
+
+
 
 
             //코루틴 사용
@@ -318,12 +355,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 var (road, building) = getLoadAddress("$longitude", "$latitude")
                 getKeyword(road, "$longitude", "$latitude")
                 var place = ""
-                if(KeywordItems.size != 0)
-                {
+                if (KeywordItems.size != 0) {
                     place = KeywordItems[0].place_name.toString()
                     placeId = KeywordItems[0].id
                     binding.placeId.text = placeId
+                    if(bookmarkList.contains(placeId)) {
+                        binding.bookmark.setImageResource(R.drawable.bookmark_yes)
+                    } else {
+                        binding.bookmark.setImageResource(R.drawable.bookmark_no)
+                    }
                     getContentData(KeywordItems[0].id)
+
+
                 }
 
                 if (place.equals("")) {
@@ -342,6 +385,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                         binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.COLLAPSED
                         cameraUpdate = CameraUpdate.scrollTo(LatLng(latitude, longitude))
                         naverMap.moveCamera(cameraUpdate)
+
+
+                        binding.bookmark.setOnClickListener {
+                            binding.bookmark.setImageResource(R.drawable.bookmark_yes)
+                            CoroutineScope(Dispatchers.Default).async {
+                                bookmarkdb.bookmarkDao().insertBookmark(Bookmark(0, FBAuth.getUid(), placeId, place))
+                            }
+                        }
                     }
                 }
 
@@ -372,6 +423,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             binding.slideFrame.panelState = SlidingUpPanelLayout.PanelState.COLLAPSED
             placeId = item.id
             binding.placeId.text = placeId
+            if(bookmarkList.contains(placeId)) {
+                binding.bookmark.setImageResource(R.drawable.bookmark_yes)
+            } else {
+                binding.bookmark.setImageResource(R.drawable.bookmark_no)
+            }
+
+            binding.bookmark.setOnClickListener {
+                binding.bookmark.setImageResource(R.drawable.bookmark_yes)
+                CoroutineScope(Dispatchers.Default).async {
+                    bookmarkdb.bookmarkDao().insertBookmark(Bookmark(0, FBAuth.getUid(), placeId, item.place_name))
+                }
+            }
             getContentData(item.id)
 
         }
@@ -422,11 +485,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val mapResponse = call.execute().body()
 
-        if(mapResponse != null) {
+        if (mapResponse != null) {
             val size = mapResponse!!.documents.size
 
-            if(size != 0) {
-                for(i in 0 until size) {
+            if (size != 0) {
+                for (i in 0 until size) {
                     // DocumentItems.add(mapResponse.documents[i])
                 }
             }
@@ -449,7 +512,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         Log.d("main", mapResponse.toString())
 
-        if(mapResponse != null) {
+        if (mapResponse != null) {
 
             val size = mapResponse!!.documents.size
 
@@ -461,30 +524,42 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun getContentData(placeId : String) {
+    private fun getContentData(placeId: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            items.clear()
 
-        val postListener = object : ValueEventListener {
-            override fun onDataChange(dataSnapshot: DataSnapshot) {
+            val itemList = CoroutineScope(Dispatchers.Default).async{
+                db.boardDao().boardData(FBAuth.getUid(), placeId)
+            }.await()
 
-                items.clear()
+            Log.d("Board", itemList.toString())
 
-                for(dataModel in dataSnapshot.children) {
-                    Log.d("main", dataModel.toString())
-                    val item = dataModel.getValue(BoardModel::class.java)
-                    items.add(item!!)
-                    Log.d("main_key", dataModel.key.toString())
-                    itemkeyList.add(dataModel.key.toString())
+            CoroutineScope(Dispatchers.Main).async {
+                for(i in 0..itemList.size-1) {
+                    items.add(itemList[i])
                 }
-                items.reverse()
-                itemkeyList.reverse()
-                rvAdapter.notifyDataSetChanged()
-            }
-            override fun onCancelled(databaseError: DatabaseError) {
-                Log.w("ContentListActivity", "loadPost: ", databaseError.toException())
-            }
+            }.await()
+            items.reverse()
+            rvAdapter.notifyDataSetChanged()
         }
-        myRef.child(placeId).addValueEventListener(postListener)
+    }
 
+    private fun getBookmarkData(uid : String) {
+
+        CoroutineScope(Dispatchers.Main).launch {
+
+            bookmarkList.clear()
+
+            val bookmark = CoroutineScope(Dispatchers.Default).async {
+                bookmarkdb.bookmarkDao().getBookmark(uid)
+            }.await()
+
+            CoroutineScope(Dispatchers.Main).async {
+                for(i in 0..bookmark.size-1) {
+                    bookmarkList.add(bookmark[i].placeId)
+                }
+            }.await()
+        }
 
     }
 }
